@@ -1,14 +1,19 @@
+#ifndef GPIO_PIN_COUNT
+#define GPIO_PIN_COUNT SOC_GPIO_PIN_COUNT
+#endif
 
+#include <Arduino.h>
 #include <WiFi.h>          // WiFi library for ESP32
 #include <PubSubClient.h>  // MQTT client library
 #include <arduinoFFT.h>    // FFT processing library
+#include "LoRaWan_APP.h"  // LoRaWAN library
 
 // ======================
 // CONFIGURATION CONSTANTS
 // ======================
 #define FFT_SAMPLE_SIZE 128                 // FFT window size
 #define QUEUE_LENGTH (FFT_SAMPLE_SIZE * 4)  // Size of FreeRTOS queues
-#define ADC_PIN 34                          // GPIO34 used for ADC input
+#define ADC_PIN 1                          // GPIO34 used for ADC input
 #define DAC_PIN 25                          // GPIO25 used for DAC output
 #define SINE_DEBUG false
 
@@ -34,6 +39,43 @@ const int dacUpdateRate = 500;          // DAC update rate in Hz
 volatile float sampleFrequency = 50.0;  // Initial maximun ADC sampling frequency
 
 
+/* TTN KEYS (LSB for EUIs, MSB for AppKey) */
+uint8_t devEui[] = { 0xA6, 0xA8, 0xD3, 0x19, 0x0F, 0x16, 0x34, 0xA1 };
+uint8_t appEui[] = { 0xCA, 0xE1, 0xD7, 0xC5, 0x20, 0xF6, 0x40, 0xFC };
+uint8_t appKey[] = "85EB71DC79E7CF292851DFE21BFD953A"; // Use the actual AppKey value here
+
+/* LoRaWAN Configuration */
+uint32_t  license[4] = {0xD5397DF0, 0x8573F814, 0x7A38C73D, 0x48D68363}; // V3 often doesn't need this, but good to have
+DeviceClass_t  loraWanClass = CLASS_A;
+LoRaMacRegion_t loraWanRegion = LORAMAC_REGION_EU868;
+bool overTheAirActivation = true;
+bool adaptiveDr = true;
+bool isTxConfirmed = true;
+uint8_t appPort = 2;
+
+/* --- LORAWAN LINKER FIXES --- */
+
+// The channels mask for your region (EU868 uses 0001)
+uint16_t userChannelsMask[6] = { 0x0001, 0x0000, 0x0000, 0x0000, 0x0000, 0x0000 };
+
+// Number of trials for a 'confirmed' message
+uint8_t confirmedNbTrials = 4;
+
+// ADR (Adaptive Data Rate) - set to true for battery efficiency
+bool loraWanAdr = true;
+
+// Duty cycle of the application (15 seconds)
+uint32_t appTxDutyCycle = 15000;
+
+// These are required by the linker even for OTAA mode
+uint32_t devAddr = (uint32_t)0;
+uint8_t nwkSKey[] = { 0 };
+uint8_t appSKey[] = { 0 };
+
+// // Prepare the payload
+// uint8_t appData[4]; // We will send the Dominant Frequency as a 4-byte float
+// uint8_t appDataSize = 4;
+
 // ======================
 // RTOS GLOBAL VARIABLES
 // ======================
@@ -52,10 +94,15 @@ typedef struct {
 // MQTT CONFIGURATION
 
 volatile bool mqtt_connected = false;  // MQTT connection status flag
-const char* ssid = "Wokwi-GUEST";
-const char* password = "";
-const char* mqtt_server = ""; // local IP address
-const int mqtt_port = 1883;               // MQTT port
+const char* ssid = "H6745-94508588";
+const char* password = "XK3eHhyFzC";
+// For PHYSICAL BOARD uncomment this and use local broker
+//const char* mqtt_server = "10.154.173.32"; // local IP address
+// for WOKWI SIMULATION use the public broker
+const char *mqtt_server = "broker.hivemq.com";//"broker.emqx.io";//Public Broker
+const char *mqtt_username = "emqx";
+const char *mqtt_password = "public";
+const int mqtt_port = 1883;  
 const char* mqtt_topic = "artificial-signal";  // MQTT topic for publishing
 
 WiFiClient espClient;            // WiFi client for MQTT
@@ -74,9 +121,10 @@ RTC_DATA_ATTR float savedSampleFrequency = 50.0;    // Default sampling frequenc
 // ======================
 void connectToWiFi() {
   Serial.println("{\"wifi_status\":\"Connecting to WiFi...\"}");
-  //WiFi.begin(ssid, password);
-  WiFi.mode(WIFI_STA);
-  WiFi.begin("Wokwi-GUEST", NULL);
+  WiFi.begin(ssid, password);
+  // for WOKWI simulation
+  // WiFi.mode(WIFI_STA);
+  // WiFi.begin("Wokwi-GUEST", NULL);
 
   unsigned long startAttemptTime = millis();
   const unsigned long timeout = 10000;  // 10 seconds timeout
@@ -100,12 +148,12 @@ void connectToWiFi() {
 void connectToMQTT() {
   Serial.println("{\"mqtt_status\":\"Connecting to MQTT broker...\"}");
   int attempts = 0;
-  const int maxAttempts = 5;  // Maximum number of connection attempts
+  const int maxAttempts = 2;  // Maximum number of connection attempts
 
   while (!client.connected() && attempts < maxAttempts) {
     Serial.printf("{\"mqtt_status\":\"Attempt %d/%d...\"}\n", attempts + 1, maxAttempts);
 
-    if (client.connect("ESP32Client")) {  // Replace "ESP32Client" with a unique client ID if needed
+    if (client.connect("Sampler_ESP32")) {  
       Serial.println("{\"mqtt_status\":\"Connected to broker!\"}");
       return;
     } else {
@@ -119,6 +167,20 @@ void connectToMQTT() {
     Serial.println("{\"mqtt_status\":\"Failed to connect to MQTT broker after multiple attempts. Restarting...\"}");
     // ESP.restart();  // Uncomment if you want to restart the ESP32 on failure
   }
+}
+
+void connectToLoRaWAN() {
+  Serial.println("{\"lorawan_status\":\"Joining LoRaWAN network...\"}");
+  Mcu.begin(0, 0); // Required for Heltec V3 power management
+  
+  pinMode(Vext, OUTPUT);
+  digitalWrite(Vext, LOW);
+
+  if (overTheAirActivation) {
+    LoRaWAN.init(loraWanClass, loraWanRegion);
+  }
+  LoRaWAN.join(); // Start the join process
+  Serial.println("{\"lorawan_status\":\"Join process initiated. Check display for status.\"}");
 }
 
 // ======================
@@ -168,7 +230,7 @@ void TaskDACWrite(void* pvParameters) {
             if (sineSum > 255) sineSum = 255;
             if (sineSum < 0) sineSum = 0;
 
-            dacWrite(DAC_PIN, (uint8_t)sineSum);
+            ledcWrite(0, (uint8_t)sineSum);
 
             // Update indices
             index1 += indexIncrement1;
@@ -180,15 +242,17 @@ void TaskDACWrite(void* pvParameters) {
             lastUpdate = now;
         }
         loopCount++;
-      if (millis() - benchmarkTimer >= 1000) {
-        Serial.printf("Actual Sampling Rate: %lu Hz\n", loopCount);
-        loopCount = 0;
-        benchmarkTimer = millis();
-      } 
+      // Use this code to find actual sampling rate.
+      // Can comment after finding
+      // if (millis() - benchmarkTimer >= 1000) {
+      //   Serial.printf("Actual Sampling Rate: %lu Hz\n", loopCount);
+      //   loopCount = 0;
+      //   benchmarkTimer = millis();
+      // } 
         
         // yield() allows high-frequency looping without the 1ms OS block.
-        yield(); 
-        //vTaskDelay(1);  // Use a small delay to allow other tasks to run, but not too long to miss DAC updates
+        // yield(); 
+        vTaskDelay(1);  // Use a small delay to allow other tasks to run, but not too long to miss DAC updates
     }
 }
 
@@ -246,6 +310,7 @@ void TaskProcess(void* pvParameters) {
 
   while (count <= 5) {
     float sum = 0.0;
+    float maxFreq = 0.0;
 
     // Receive FFT_SAMPLE_SIZE samples
     for (int i = 0; i < FFT_SAMPLE_SIZE; i++) {
@@ -273,10 +338,9 @@ void TaskProcess(void* pvParameters) {
 
     FFT.windowing(vReal, FFT_SAMPLE_SIZE, FFT_WIN_TYP_HAMMING, FFT_FORWARD);  // Apply window
     FFT.compute(vReal, vImag, FFT_SAMPLE_SIZE, FFT_FORWARD);                  // Compute FFT
+    FFT.complexToMagnitude(vReal, vImag, FFT_SAMPLE_SIZE);  // Convert to magnitude
 
     for (int i = 0; i < 20; i++) vReal[i] = 0.0;  // Zero out low-frequency bins
-
-    FFT.complexToMagnitude(vReal, vImag, FFT_SAMPLE_SIZE);  // Convert to magnitude
 
     float peakFrequency = FFT.majorPeak(vReal, FFT_SAMPLE_SIZE, mean_sampling_freq);
 
@@ -333,8 +397,12 @@ void TaskProcess(void* pvParameters) {
     portEXIT_CRITICAL(&samplingMux);
 }
 
+  // uncomment to oversample at maximum frequency
+  sampleFrequency = 1000;
+  savedSampleFrequency = 1000;
   fftPerformed = true;  // Set the flag to indicate FFT has been performed
-  Serial.println("[FFT] FFT computation completed. Flag set.");
+  Serial.println("[FFT] FFT computation completed. Flag set. The sampling frequency is adapted to ");
+  Serial.printf("%.2f Hz\n", sampleFrequency);
   vTaskDelete(NULL);
 }
 
@@ -356,7 +424,8 @@ void TaskAggregation(void* param) {
       count++;
       elapsed_time = micros() - start_time;
 
-      if (elapsed_time >= 5000000UL) {  // Every 5 seconds
+      if (elapsed_time >= 5000000UL) {
+        unsigned long aggregation_start = micros();  // Every 5 seconds
         float average = (count > 0) ? (float)sum / count : 0.0;
         unsigned long timestamp = micros();  // Capture the timestamp when data is sent
 
@@ -375,10 +444,20 @@ void TaskAggregation(void* param) {
             Serial.println("{\"mqtt_status\":\"Failed to send data!\"}");
           }
         }
+        if (deviceState == DEVICE_STATE_SEND || deviceState == DEVICE_STATE_CYCLE) {
+          // Convert float average to byte array
+          memcpy(appData, &average, 4);
+      
+          // Send the data
+          LoRaWAN.send();
+          Serial.println("[LoRa] Packet sent to TTN");
+      }
         // Reset counters
         start_time = micros();
         sum = 0;
         count = 0;
+        Serial.printf("Per window execution time: ");
+        Serial.printf("%lu ms\n", (micros() - aggregation_start) / 1000);
       }
     }
   }
@@ -392,6 +471,8 @@ unsigned long lastSleepTime = 0;  // Tracks the last time deep sleep was trigger
 void setup() {
   Serial.begin(115200);
   delay(1000);
+  ledcSetup(0, 5000, 8);
+  ledcAttachPin(DAC_PIN, 0);
 
   // Check if the ESP32 woke up from deep sleep
   if (esp_sleep_get_wakeup_cause() == ESP_SLEEP_WAKEUP_TIMER) {
@@ -416,7 +497,9 @@ void setup() {
     mqtt_connected ? "connected" : "disconnected"
   );
 
-  dacWrite(DAC_PIN, offset);       // Initialize DAC output
+  // connectToLoRaWAN();  // Connect to LoRaWAN network
+
+  ledcWrite(0, offset);       // Initialize DAC output
   analogReadResolution(8);         // 8-bit ADC resolution
   analogSetAttenuation(ADC_11db);  // ADC attenuation setting
 
@@ -438,7 +521,7 @@ void setup() {
   xTaskCreatePinnedToCore(TaskDACWrite, "DAC_Gen", 4096, NULL, 1, NULL, 0);
   xTaskCreatePinnedToCore(TaskADCRead, "ADC_Sample", 4096, NULL, 2, &ADC_TaskHandle, 1);
   xTaskCreatePinnedToCore(TaskProcess, "Data_Process", 8192, NULL, 1, &Process_TaskHandle, 0);
-  xTaskCreatePinnedToCore(TaskAggregation, "RollingAverage", 4096, NULL, 1, NULL, 0);
+  xTaskCreatePinnedToCore(TaskAggregation, "RollingAverage", 4096, NULL, 2, NULL, 0);
 
   Serial.print("System Initialized: Tasks Running");
 

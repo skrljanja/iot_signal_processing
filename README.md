@@ -1,7 +1,7 @@
 # iot_signal_processing
 Internet of Things individual assignment
 
-## Assigment
+## Description
 
 The goal of the assignment is to create an IoT system that collects information from a sensor, analyses the data locally and communicates to a nearby server an aggregated value of the sensor readings. The IoT system adapts the sampling frequency in order to save energy and reduce communication overhead. The IoT device will be based on an ESP32 prototype board and the firmware will be developed using the FreeRTOS. You are free to use IoT-Lab or real devices.
 
@@ -10,7 +10,7 @@ The goal of the assignment is to create an IoT system that collects information 
 We are free to choose any signal of the form SUM(a_k*sin(f_k)). I have chosen: 
 
 ```
-input_signal(t) = 3*sin(2*pi*t)+2*sin(2*pi*7*t)
+input_signal(t) = 5*sin(2*pi*2*t)+11*sin(2*pi*12*t)
 ```
 as defined in src/main-sampler.cpp
 
@@ -21,15 +21,34 @@ I also look at the actual sampling rate experimentally, by counting samples in t
 
 If we wanted to test the actual feasible maximum we can use yield() instead.  This way, the actual sampling frequency goes up to rouhgly 42kHz. However, this might stop other tasks so it is an unsafe way of sampling, if we want the same board to also do other things. 
 
+## Identify optimal sampling frequency
+This is performed using the FFT. 
+For robustness, I perform the FFT 6 times and take the average of the maximum frequencies found.
 
+## Compute aggregate function over a window
+TaskAggregation calculates the average over a window 
 
+## Communicating the aggregate value
+* Communication to the edge: Using MQTT over Wifi
+* Communication to the cloud: Using LoRaWAN+TTN - since the sampling and aggregating and FFT and communication is all done by the same board, connecting to LoRA overwhelmed the board, compromising the FFT transformations. Therefore, this code has been commented out. 
 
+Note: when on Wokwi, use public broker for MQTT (uncomment and comment appropriate code in main-sampler.cpp) AND a virtual WiFI network called Wokwi-GUEST.
+
+## Measure the performance of the system
+### Energy 
+Since the sending is dependent on time, as opposed to number of samples, the result is actually really similar for both scenarios. 
+
+### Per window execution 
+Both take around 12-13ms, with oversampling taking order of magnitude 0.1ms more on average. 
+
+### Volume of Data
+
+### End-to-end Latency 
+d
+## Bonus: Other signals
 
 ## Setup
- ESP32 2 Cores Signal Processing System
- *  DAC Signal Generation + Data Processing
- *  ADC Sampling
- 
+
 To connect to WiFi and MQTT broker, follow these steps:  
  * 1. Set up your WiFi credentials (SSID and password) in the code (Both your PC and ESP32 should be connected to the same WiFi network)
  * 2. Set up your MQTT broker address, config and port. 
