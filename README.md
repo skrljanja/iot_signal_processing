@@ -15,7 +15,14 @@ input_signal(t) = 3*sin(2*pi*t)+2*sin(2*pi*7*t)
 as defined in src/main-sampler.cpp
 
 ## Maximum Sampling Frequency
-Note, that we are not using a real sensor, 
+Note, that we are not using a real sensor, so really the maximum frequency depends on the task clock - since I am using vTaskDelay(1), which means there is 1ms delay between taking samples, the maximum frequency should be 1000Hz. 
+
+I also look at the actual sampling rate experimentally, by counting samples in the loop.
+
+If we wanted to test the actual feasible maximum we can use yield() instead.  This way, the actual sampling frequency goes up to rouhgly 42kHz. However, this might stop other tasks so it is an unsafe way of sampling, if we want the same board to also do other things. 
+
+
+
 
 
 ## Setup

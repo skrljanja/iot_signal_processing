@@ -52,9 +52,9 @@ typedef struct {
 // MQTT CONFIGURATION
 
 volatile bool mqtt_connected = false;  // MQTT connection status flag
-const char* ssid = "";
+const char* ssid = "Wokwi-GUEST";
 const char* password = "";
-const char* mqtt_server = "";
+const char* mqtt_server = ""; // local IP address
 const int mqtt_port = 1883;               // MQTT port
 const char* mqtt_topic = "artificial-signal";  // MQTT topic for publishing
 
@@ -74,7 +74,9 @@ RTC_DATA_ATTR float savedSampleFrequency = 50.0;    // Default sampling frequenc
 // ======================
 void connectToWiFi() {
   Serial.println("{\"wifi_status\":\"Connecting to WiFi...\"}");
-  WiFi.begin(ssid, password);
+  //WiFi.begin(ssid, password);
+  WiFi.mode(WIFI_STA);
+  WiFi.begin("Wokwi-GUEST", NULL);
 
   unsigned long startAttemptTime = millis();
   const unsigned long timeout = 10000;  // 10 seconds timeout
@@ -118,13 +120,14 @@ void connectToMQTT() {
     // ESP.restart();  // Uncomment if you want to restart the ESP32 on failure
   }
 }
+
 // ======================
 // SINE LOOKUP CONFIG
 // ======================
 #define TABLE_SIZE 512
 int sineTable[TABLE_SIZE];
 
-// Call this once in void setup()
+// Call this once in void setup(). This makes the sampling faster then calling sin() everytime.
 void initSineTable() {
     for (int i = 0; i < TABLE_SIZE; i++) {
         // Pre-calculate: (amplitude * sin(angle) + offset)
@@ -183,9 +186,9 @@ void TaskDACWrite(void* pvParameters) {
         benchmarkTimer = millis();
       } 
         
-        // Critical: yield() instead of vTaskDelay(1) 
-        // This allows high-frequency looping without the 1ms OS block.
+        // yield() allows high-frequency looping without the 1ms OS block.
         yield(); 
+        //vTaskDelay(1);  // Use a small delay to allow other tasks to run, but not too long to miss DAC updates
     }
 }
 
