@@ -49,21 +49,4 @@ d
 
 ## Setup
 
-To connect to WiFi and MQTT broker, follow these steps:  
- * 1. Set up your WiFi credentials (SSID and password) in the code (Both your PC and ESP32 should be connected to the same WiFi network)
- * 2. Set up your MQTT broker address, config and port. 
- *  - C:\Program Files\mosquitto\mosquitto.conf should have the following uncomented lines:
- *      - listener 1883
- *      - allow_anonymous true
- *  - mqtt_server = Use Win + r, open command prompt using cmd, and type ipconfig to find your local IP address 192.168.XXX.XX
- *  - mqtt_port = 1883; This is default port for MQTT. You could change it in the file mosquitto.conf
- *  - mqtt_topic = This is the topic for publishing data. Can be any name you want.
- * 3. To start the MQTT broker open a terminal and paste: mosquitto -c "C:\Program Files\mosquitto\mosquitto.conf" -v .
- *  - netstat -ano | findstr :1883  to show the port is open 
- * 
-
- * 4. Open another terminal and paste: mosquitto_sub -h <mqtt_server> -t "<mqtt_topic>" -v to subscribe to the topic.
- * 
- * 5. Upload the code to your ESP32 board.
- * 6. Open the Serial Monitor to see the output.
- */
+To connect to WiFi, edit the WiFi configuration variables in main-sampler.cpp
