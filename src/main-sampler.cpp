@@ -17,9 +17,22 @@ const int amplitude = 5;           // Amplitude of sine wave1
 const float frequency = 2.0;       // Base frequency for DAC signal  1
 const int amplitude2 = 11;         // Amplitude of sine wave 2
 const float frequency2 = 12.0;     // Base frequency for DAC signal 2
+// // BONUS SIGNAL 1
+// const int amplitude = 7;           // Amplitude of sine wave1
+// const float frequency = 7.0;       // Base frequency for DAC signal  1
+// const int amplitude2 = 8;         // Amplitude of sine wave 2
+// const float frequency2 = 13.0;     // Base frequency for DAC signal 2
+// // BONUS SIGNAL 2
+// const int offset = 128;            // DC offset for sine wave
+// const int amplitude = 9;           // Amplitude of sine wave1
+// const float frequency = 5.0;       // Base frequency for DAC signal  1
+// const int amplitude2 = 6;         // Amplitude of sine wave 2
+// const float frequency2 = 15.0;     // Base frequency for DAC signal 2
+
 
 const int dacUpdateRate = 500;          // DAC update rate in Hz
 volatile float sampleFrequency = 50.0;  // Initial maximun ADC sampling frequency
+
 
 // ======================
 // RTOS GLOBAL VARIABLES
@@ -106,35 +119,74 @@ void connectToMQTT() {
   }
 }
 // ======================
+// SINE LOOKUP CONFIG
+// ======================
+#define TABLE_SIZE 512
+int sineTable[TABLE_SIZE];
+
+// Call this once in void setup()
+void initSineTable() {
+    for (int i = 0; i < TABLE_SIZE; i++) {
+        // Pre-calculate: (amplitude * sin(angle) + offset)
+        // Adjust values to fit 8-bit DAC (0-255)
+        float angle = (2.0 * PI * i) / TABLE_SIZE;
+        sineTable[i] = (int)(amplitude * sin(angle) + offset);
+    }
+}
+
+// ======================
 // DAC SIGNAL GENERATOR (Core 0)
 // ======================
 void TaskDACWrite(void* pvParameters) {
-  float phase = 0;
-  float phase2 = 4 * PI / 3;  // Phase offset for second sine wave
-  const float phaseIncrement = 2 * PI * frequency / dacUpdateRate;
-  const float phaseIncrement2 = 2 * PI * frequency2 / dacUpdateRate;
-  unsigned long lastUpdate = micros();
+    // Instead of phase in radians, we track the "index" in the table
+    float index1 = 0;
+    float index2 = (4.0 / 3.0) * (TABLE_SIZE / 2.0); // Phase offset
+    unsigned long loopCount = 0;
+    unsigned long benchmarkTimer = millis();
+    
+    // Increment is based on: (Desired Freq * Table Size) / Sample Rate
+    const float indexIncrement1 = (float)frequency * TABLE_SIZE / dacUpdateRate;
+    const float indexIncrement2 = (float)frequency2 * TABLE_SIZE / dacUpdateRate;
 
-  while (1) {
-    unsigned long now = micros();
-    if (now - lastUpdate >= (1000000UL / dacUpdateRate)) {
-      int sineValue = (int)(amplitude * sin(phase) + offset);  // Generate sine wave value
-      int sineValue2 = (int)(amplitude * sin(phase2));         // Generate sine wave value
-      int sineSum = sineValue + sineValue2;
-      dacWrite(DAC_PIN, sineSum);  // Output to DAC
-      phase += phaseIncrement;
-      if (phase >= 2 * PI) phase -= 2 * PI;  // Keep phase within 0 to 2π
-      phase2 += phaseIncrement2;
-      if (phase2 >= 2 * PI) phase2 -= 2 * PI;  // Keep phase within 0 to 2π
-      lastUpdate = now;
+    unsigned long lastUpdate = micros();
+    const unsigned long interval = 1000000UL / dacUpdateRate;
 
-      // ------ PLOT SIGNAL TO DEBUG (SHOULD BE COMMENTED)--------
-      if (SINE_DEBUG == true) {  
-        Serial.printf("DATA:%lu,%d\n", micros(), sineSum);
-      }
+    while (1) {
+        unsigned long now = micros();
+        
+        if (now - lastUpdate >= interval) {
+            // Fast lookup instead of sin()
+            int val1 = sineTable[(int)index1 % TABLE_SIZE];
+            int val2 = sineTable[(int)index2 % TABLE_SIZE];
+            
+            int sineSum = val1 + val2;
+            
+            // Constrain to 8-bit range to prevent wrapping/clipping
+            if (sineSum > 255) sineSum = 255;
+            if (sineSum < 0) sineSum = 0;
+
+            dacWrite(DAC_PIN, (uint8_t)sineSum);
+
+            // Update indices
+            index1 += indexIncrement1;
+            if (index1 >= TABLE_SIZE) index1 -= TABLE_SIZE;
+            
+            index2 += indexIncrement2;
+            if (index2 >= TABLE_SIZE) index2 -= TABLE_SIZE;
+
+            lastUpdate = now;
+        }
+        loopCount++;
+      if (millis() - benchmarkTimer >= 1000) {
+        Serial.printf("Actual Sampling Rate: %lu Hz\n", loopCount);
+        loopCount = 0;
+        benchmarkTimer = millis();
+      } 
+        
+        // Critical: yield() instead of vTaskDelay(1) 
+        // This allows high-frequency looping without the 1ms OS block.
+        yield(); 
     }
-    vTaskDelay(1);  // Yield to other tasks
-  }
 }
 
 // ------------------------------------------------------------------------------------------------------------------------------------------------------------------

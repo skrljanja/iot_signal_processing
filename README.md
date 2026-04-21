@@ -12,16 +12,19 @@ We are free to choose any signal of the form SUM(a_k*sin(f_k)). I have chosen:
 ```
 input_signal(t) = 3*sin(2*pi*t)+2*sin(2*pi*7*t)
 ```
+as defined in src/main-sampler.cpp
+
+## Maximum Sampling Frequency
+Note, that we are not using a real sensor, 
 
 
-/*
- * ESP32 2 Cores Signal Processing System
- * - DAC Signal Generation + Data Processing
- * - ADC Sampling
- * 
- * To connect to WiFi and MQTT broker, follow these steps:  
- * 1. Set up your WiFi credentials (SSID and password) in the code.
- *  -   Both your PC and ESP32 should be connected to the same WiFi network.
+## Setup
+ ESP32 2 Cores Signal Processing System
+ *  DAC Signal Generation + Data Processing
+ *  ADC Sampling
+ 
+To connect to WiFi and MQTT broker, follow these steps:  
+ * 1. Set up your WiFi credentials (SSID and password) in the code (Both your PC and ESP32 should be connected to the same WiFi network)
  * 2. Set up your MQTT broker address, config and port. 
  *  - C:\Program Files\mosquitto\mosquitto.conf should have the following uncomented lines:
  *      - listener 1883

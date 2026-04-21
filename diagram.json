@@ -1,0 +1,15 @@
+{
+  "version": 1,
+  "author": "ANJA",
+  "editor": "wokwi",
+  "parts": [
+    { "type": "wokwi-esp32-devkit-v1", "id": "esp", "top": -192.67, "left": -23.33, "attrs": {} }
+      ],
+  "connections": [
+    [ "esp:TX0", "$serialMonitor:RX", "", [] ],
+    [ "esp:RX0", "$serialMonitor:TX", "", [] ],
+    [ "esp:D25", "esp:D34", "red", [] ]
+  ],
+  "serialMonitor": { "display": "terminal" },
+  "dependencies": {}
+}
