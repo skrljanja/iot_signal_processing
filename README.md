@@ -84,7 +84,10 @@ input_signal(t) = 4*sin(2*pi*7*t)+11*sin(2*pi*100*t)
 ## LLM Analysis 
 In contrast to my approach, the LLM only does it using 2 tasks. 
 Despite being given whole instructions, it does not produce code for connecting to WiFi and LoRa, but produces mostly correct code for the sampling, the FFT transform and the sampling noise filters. The communication could also be done if I employed further prompting. 
-However, for the FFT it only finds the peak frequency, not the maximum represented frequency, which is incorrect for adjusting sampling frequency. 
+However, for the FFT it only finds the peak frequency, not the maximum represented frequency, which is incorrect for adjusting sampling frequency - could lead for undersampling. 
+Other observations
+* The LLM adds a 10% safety margin to the Nyquist Frequency.
+* It uses mutexes, which are potentially overkill for this project, but are good practice 
 
 ## Setup
 Clone this repository. I am running it in VSCode, using the platformIO and WOKWI plugins (Wokwi is only necessary in case that you want to run it on a simulated chip).
