@@ -18,31 +18,30 @@
 #define SINE_DEBUG false
 
 const int offset = 128;            // DC offset for sine wave
-const int amplitude = 5;           // Amplitude of sine wave1
+const int amplitude = 5;           // Amplitude of sine wave 1
 const float frequency = 2.0;       // Base frequency for DAC signal  1
 const int amplitude2 = 11;         // Amplitude of sine wave 2
 const float frequency2 = 12.0;     // Base frequency for DAC signal 2
 // // BONUS SIGNAL 1
-// const int amplitude = 7;           // Amplitude of sine wave1
-// const float frequency = 7.0;       // Base frequency for DAC signal  1
+// const int amplitude = 7;           // Amplitude of sine wave 1
+// const float frequency = 23.0;       // Base frequency for DAC signal  1
 // const int amplitude2 = 8;         // Amplitude of sine wave 2
-// const float frequency2 = 13.0;     // Base frequency for DAC signal 2
+// const float frequency2 = 100.0;     // Base frequency for DAC signal 2
 // // BONUS SIGNAL 2
-// const int offset = 128;            // DC offset for sine wave
-// const int amplitude = 9;           // Amplitude of sine wave1
-// const float frequency = 5.0;       // Base frequency for DAC signal  1
+// const int amplitude = 9;           // Amplitude of sine wave 1
+// const float frequency = 43.0;       // Base frequency for DAC signal  1
 // const int amplitude2 = 6;         // Amplitude of sine wave 2
 // const float frequency2 = 15.0;     // Base frequency for DAC signal 2
 
 
 const int dacUpdateRate = 500;          // DAC update rate in Hz
-volatile float sampleFrequency = 50.0;  // Initial maximun ADC sampling frequency
+volatile float sampleFrequency = 1000.0;  // Initial maximun ADC sampling frequency
 
 
 /* TTN KEYS (LSB for EUIs, MSB for AppKey) */
 uint8_t devEui[] = { 0xA6, 0xA8, 0xD3, 0x19, 0x0F, 0x16, 0x34, 0xA1 };
 uint8_t appEui[] = { 0xCA, 0xE1, 0xD7, 0xC5, 0x20, 0xF6, 0x40, 0xFC };
-uint8_t appKey[] = "85EB71DC79E7CF292851DFE21BFD953A"; // Use the actual AppKey value here
+uint8_t appKey[] = {0x85, 0xEB, 0x71, 0xDC, 0x79, 0xE7, 0xCF, 0x29, 0x28, 0x51, 0xDF, 0xE2, 0x1B, 0xFD, 0x95, 0x3A}; // Use the actual AppKey value here
 
 /* LoRaWAN Configuration */
 uint32_t  license[4] = {0xD5397DF0, 0x8573F814, 0x7A38C73D, 0x48D68363}; // V3 often doesn't need this, but good to have
@@ -81,6 +80,7 @@ QueueHandle_t sampleQueue;               // Queue for FFT samples
 QueueHandle_t aggQueue;                  // Queue for averaging
 TaskHandle_t ADC_TaskHandle = NULL;      // Handle for ADC task
 TaskHandle_t Process_TaskHandle = NULL;  // Handle for processing task
+bool loraConnected = false;
 
 // Struct for ADC data and its timing
 typedef struct {
@@ -92,12 +92,13 @@ typedef struct {
 // MQTT CONFIGURATION
 
 volatile bool mqtt_connected = false;  // MQTT connection status flag
-const char* ssid = "H6745-94508588";
-const char* password = "XK3eHhyFzC";
+const char* ssid = "Anja's Galaxy A32 5G";
+const char* password = "marina123";
 // For PHYSICAL BOARD uncomment this and use local broker
 //const char* mqtt_server = "10.154.173.32"; // local IP address
 // for WOKWI SIMULATION use the public broker
-const char *mqtt_server = "broker.hivemq.com";//"broker.emqx.io";//Public Broker
+//const char *mqtt_server = "broker.hivemq.com";//"broker.emqx.io";//Public Broker
+const char *mqtt_server = "broker.emqx.io";
 const char *mqtt_username = "emqx";
 const char *mqtt_password = "public";
 const int mqtt_port = 1883;  
@@ -109,15 +110,15 @@ PubSubClient client(espClient);  // MQTT client object
 portMUX_TYPE samplingMux = portMUX_INITIALIZER_UNLOCKED;
 
 RTC_DATA_ATTR bool fftPerformed = false;            // Flag to track FFT
-RTC_DATA_ATTR float savedSampleFrequency = 50.0;    // Default sampling frequency
+RTC_DATA_ATTR float savedSampleFrequency = 1000.0;    // Default sampling frequency
 
 
 void connectToWiFi() {
   Serial.println("{\"wifi_status\":\"Connecting to WiFi...\"}");
   WiFi.begin(ssid, password);
   // for WOKWI simulation
-  // WiFi.mode(WIFI_STA);
-  // WiFi.begin("Wokwi-GUEST", NULL);
+  //WiFi.mode(WIFI_STA);
+  //WiFi.begin("Wokwi-GUEST", NULL);
 
   unsigned long startAttemptTime = millis();
   const unsigned long timeout = 10000;  // 10 seconds timeout
@@ -171,6 +172,7 @@ void connectToLoRaWAN() {
   }
   LoRaWAN.join(); // Start the join process
   Serial.println("{\"lorawan_status\":\"Join process initiated. Check display for status.\"}");
+  loraConnected = true; // Set to true to allow sending data, but actual join status should be checked in the main loop or via event callbacks
 }
 
 // Sine lookup table - this is faster then calling sin() in the DAC task. 
@@ -374,11 +376,12 @@ void TaskProcess(void* pvParameters) {
     sampleFrequency = totalSampleFrequency / 5;  // Average sampling frequency
     savedSampleFrequency = sampleFrequency;  // Save to RTC memory
     portEXIT_CRITICAL(&samplingMux);
+    connectToLoRaWAN();  // Connect to LoRaWAN network
 }
 
   // uncomment to oversample at maximum frequency
-  sampleFrequency = 1000;
-  savedSampleFrequency = 1000;
+  // sampleFrequency = 1000;
+  // savedSampleFrequency = 1000;
   fftPerformed = true;  // Set the flag to indicate FFT has been performed
   Serial.println("[FFT] FFT computation completed. Flag set. The sampling frequency is adapted to ");
   Serial.printf("%.2f Hz\n", sampleFrequency);
@@ -419,11 +422,10 @@ void TaskAggregation(void* param) {
             Serial.println("{\"mqtt_status\":\"Failed to send data!\"}");
           }
         }
-        if (deviceState == DEVICE_STATE_SEND || deviceState == DEVICE_STATE_CYCLE) {
+        if (loraConnected) {
           // Convert float average to byte array
           memcpy(appData, &average, 4);
       
-          // Send the data
           LoRaWAN.send();
           Serial.println("[LoRa] Packet sent to TTN");
       }
@@ -438,9 +440,6 @@ void TaskAggregation(void* param) {
   }
 }
 
-// ======================
-// INITIALIZATION
-// ======================
 unsigned long lastSleepTime = 0;  // Tracks the last time deep sleep was triggered
 
 void setup() {
@@ -472,8 +471,6 @@ void setup() {
     mqtt_connected ? "connected" : "disconnected"
   );
 
-  // connectToLoRaWAN();  // Connect to LoRaWAN network
-
   ledcWrite(0, offset);       // Initialize DAC output
   analogReadResolution(8);         // 8-bit ADC resolution
   analogSetAttenuation(ADC_11db);  // ADC attenuation setting
@@ -494,7 +491,7 @@ void setup() {
 
   // Create tasks and assign them to specific cores
   xTaskCreatePinnedToCore(TaskDACWrite, "DAC_Gen", 4096, NULL, 1, NULL, 0);
-  xTaskCreatePinnedToCore(TaskADCRead, "ADC_Sample", 4096, NULL, 2, &ADC_TaskHandle, 1);
+  xTaskCreatePinnedToCore(TaskADCRead, "ADC_Sample", 4096, NULL, 1, &ADC_TaskHandle, 1);
   xTaskCreatePinnedToCore(TaskProcess, "Data_Process", 8192, NULL, 1, &Process_TaskHandle, 0);
   xTaskCreatePinnedToCore(TaskAggregation, "RollingAverage", 4096, NULL, 2, NULL, 0);
 

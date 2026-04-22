@@ -30,7 +30,7 @@ TaskAggregation calculates the average over a window
 
 ## Communicating the aggregate value
 * Communication to the edge: Using MQTT over Wifi
-* Communication to the cloud: Using LoRaWAN+TTN - since the sampling and aggregating and FFT and communication is all done by the same board, connecting to LoRA overwhelmed the board, compromising the FFT transformations. Therefore, this code has been commented out. 
+* Communication to the cloud: Using LoRaWAN+TTN - the connection is established only once we have already performed the FFT and adapted the sampling rate. 
 
 Note: when on Wokwi, use public broker for MQTT (uncomment and comment appropriate code in main-sampler.cpp) AND a virtual WiFI network called Wokwi-GUEST.
 
@@ -57,7 +57,7 @@ The possible reasons for the lack of difference are:
 ### Per window execution 
 This was measured by noting the time at the start of the aggregation, and printing the time elapsed once we have sent the aggregated data via WiFi. 
 
-Both take around 12-13ms, with oversampling taking order of magnitude 0.1ms more on average. The aggregation is likely a much smaller part of the execution time compared to the MQTT communication. 
+Both take around 14ms (including MQTT sending and LoRa sending), with oversampling taking order of magnitude 0.1ms more on average. The aggregation is likely a much smaller part of the execution time compared to the MQTT communication. 
 
 ### Volume of Data
 Measured using Wireshark. Install Wireshark and navigate to the directory. Then run (as admin):
@@ -71,8 +71,15 @@ Regardless of sampling rates, the payload size is the same (12 packets). The lac
 
 ## Bonus: Other signals
 To try other signals, uncomment the different amplitude/frequency variables in main-sampler.cpp (20-35).
+
 As with the sampling the difference was not large, neither is it at other signals. 
-I can observe with other signals however, that the FFT seems to be getting close to the theoretical ideal frequency (which is trivial to see from the formula we use to compute it).
+The FFT gets close to the theoretical ideal frequency, only as long as the max frequency is bounded. 
+
+When the frequency of one of the waves is too high, the found max frequency actually corresponds to the frequency of the other lower-frequency wave.
+
+```
+input_signal(t) = 4*sin(2*pi*7*t)+11*sin(2*pi*100*t)
+```
 
 ## Setup
 Clone this repository. I am running it in VSCode, using the platformIO and WOKWI plugins (Wokwi is only necessary in case that you want to run it on a simulated chip).
