@@ -55,10 +55,12 @@ This was measured by noting the time at the start of the aggregation, and printi
 Both take around 12-13ms, with oversampling taking order of magnitude 0.1ms more on average. The aggregation is likely a much smaller part of the execution time compared to the MQTT communication. 
 
 ### Volume of Data
-Measured using Wireshark. Install Wireshark and navigate to the directory. Then run:
-'''
-sudo tshark -i en0 -f "host [IP] and port 1883" -a duration:30 -w [NAME].pcap
-'''
+Measured using Wireshark. Install Wireshark and navigate to the directory. Then run (as admin):
+
+```
+tshark -i [INDEX] -f "host [IP] and port 1883" -a duration:30 -w output.pcap
+```
+
 to find volume of data in 30 seconds. In 30 seconds we expect to send an aggregate 6 times (since we aggregate every 5 seconds).
 Regardless of sampling rates, the payload size is the same (12 packets). The lack of difference is expected. 
 
