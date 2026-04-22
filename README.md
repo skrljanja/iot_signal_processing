@@ -38,15 +38,39 @@ Note: when on Wokwi, use public broker for MQTT (uncomment and comment appropria
 ### Energy 
 Since the sending is dependent on time, as opposed to number of samples, the result is actually really similar for both scenarios. 
 
+![mA current using adaptive sampling](img/adaptive_sampling.png)
+
+![mA current using oversampling](img/oversampled.png)
+
+Here, I get an unexpacted result: the power consumption is actually really similar. 
+In order to try and see a difference I calibrated the INA resolution, but it did not change the results. 
+
+The possible reasons for the lack of difference are:
+* The power supply is an USB connection to my laptop: the USB-to-UART bridge chip comsumes power and adds noise to the base current, masking small differences caused by frequency
+* The communication is the power bottleneck, also masking the small difference caused by sampling 
+
 ### Per window execution 
-Both take around 12-13ms, with oversampling taking order of magnitude 0.1ms more on average. 
+This was measured by noting the time at the start of the aggregation, and printing the time elapsed once we have sent the aggregated data via WiFi. 
+
+Both take around 12-13ms, with oversampling taking order of magnitude 0.1ms more on average. The aggregation is likely a much smaller part of the execution time compared to the MQTT communication. 
 
 ### Volume of Data
+Measured using Wireshark. Install Wireshark and navigate to the directory. Then run:
+'''
+sudo tshark -i en0 -f "host [IP] and port 1883" -a duration:30 -w [NAME].pcap
+'''
+to find volume of data in 30 seconds. In 30 seconds we expect to send an aggregate 6 times (since we aggregate every 5 seconds).
+Regardless of sampling rates, the payload size is the same (12 packets). The lack of difference is expected. 
 
-### End-to-end Latency 
-d
 ## Bonus: Other signals
+To try other signals, uncomment the different amplitude/frequency variables in main-sampler.cpp (20-35).
+As with the sampling the difference was not large, neither is it at other signals. 
+I can observe with other signals however, that the FFT seems to be getting close to the theoretical ideal frequency (which is trivial to see from the formula we use to compute it).
 
 ## Setup
+Clone this repository. I am running it in VSCode, using the platformIO and WOKWI plugins (Wokwi is only necessary in case that you want to run it on a simulated chip).
+The dependencies are listed in the .ini file and will resolve when building the project using platformIO.
 
-To connect to WiFi, edit the WiFi configuration variables in main-sampler.cpp
+Monitoring the power consumption is not possible in the simulation - 2 ESP32 chips are required, one for running the code, the other for monitoring power consumption. 
+
+To connect to WiFi, edit the WiFi configuration variables in main-sampler.cpp (96-100)

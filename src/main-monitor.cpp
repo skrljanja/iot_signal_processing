@@ -16,13 +16,12 @@ void setup(void)
       delay(1);
   }
   
-
   // Initialize the INA219 
    if (! ina219.begin()) {
     Serial.println("Failed. Chip not found. Check wiring.");
     while (1) { delay(10); }
   }
-  // for high sampling frequencies, I use
+  // Set calibration for INA219 to measure up to 16V and 400mA
   ina219.setCalibration_16V_400mA();
   Serial.println("Measuring energy consumption with INA219:");
 }

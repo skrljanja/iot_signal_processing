@@ -76,9 +76,7 @@ uint8_t appSKey[] = { 0 };
 // uint8_t appData[4]; // We will send the Dominant Frequency as a 4-byte float
 // uint8_t appDataSize = 4;
 
-// ======================
-// RTOS GLOBAL VARIABLES
-// ======================
+// Global variables
 QueueHandle_t sampleQueue;               // Queue for FFT samples
 QueueHandle_t aggQueue;                  // Queue for averaging
 TaskHandle_t ADC_TaskHandle = NULL;      // Handle for ADC task
@@ -113,12 +111,7 @@ portMUX_TYPE samplingMux = portMUX_INITIALIZER_UNLOCKED;
 RTC_DATA_ATTR bool fftPerformed = false;            // Flag to track FFT
 RTC_DATA_ATTR float savedSampleFrequency = 50.0;    // Default sampling frequency
 
-// ------------------------------------------------------------------------------------------------------------------------------------------------------------------
 
-
-// ======================
-// WIFI CONNECTION HELPER
-// ======================
 void connectToWiFi() {
   Serial.println("{\"wifi_status\":\"Connecting to WiFi...\"}");
   WiFi.begin(ssid, password);
@@ -142,9 +135,6 @@ void connectToWiFi() {
   }
 }
 
-// ======================
-// MQTT CONNECTION HELPER
-// ======================
 void connectToMQTT() {
   Serial.println("{\"mqtt_status\":\"Connecting to MQTT broker...\"}");
   int attempts = 0;
@@ -183,9 +173,7 @@ void connectToLoRaWAN() {
   Serial.println("{\"lorawan_status\":\"Join process initiated. Check display for status.\"}");
 }
 
-// ======================
-// SINE LOOKUP CONFIG
-// ======================
+// Sine lookup table - this is faster then calling sin() in the DAC task. 
 #define TABLE_SIZE 512
 int sineTable[TABLE_SIZE];
 
@@ -199,9 +187,7 @@ void initSineTable() {
     }
 }
 
-// ======================
-// DAC SIGNAL GENERATOR (Core 0)
-// ======================
+// DAC Signal generated - core 1
 void TaskDACWrite(void* pvParameters) {
     // Instead of phase in radians, we track the "index" in the table
     float index1 = 0;
@@ -258,9 +244,7 @@ void TaskDACWrite(void* pvParameters) {
 
 // ------------------------------------------------------------------------------------------------------------------------------------------------------------------
 
-// ======================
-// ADC SAMPLING TASK (Core 1)
-// ======================
+// ADC Sampling task - core 2
 void TaskADCRead(void* parameter) {
   ADCData_t adc_data;
   unsigned long t_prev = micros();  // Initial timestamp
@@ -286,12 +270,7 @@ void TaskADCRead(void* parameter) {
   }
 }
 
-// ------------------------------------------------------------------------------------------------------------------------------------------------------------------
-
-
-// ======================
-// DATA PROCESSING TASK (Core 0)
-// ======================
+// Data processing and FFT task (Core 1)
 void TaskProcess(void* pvParameters) {
   if (fftPerformed) {
     Serial.println("[FFT] Skipping FFT computation (already performed).");
@@ -406,11 +385,7 @@ void TaskProcess(void* pvParameters) {
   vTaskDelete(NULL);
 }
 
-
-
-// ======================
-// AGGREGATION + MQTT PUBLISH TASK (Core 0)
-// ======================
+// Aggregation task and publishing - core 2
 void TaskAggregation(void* param) {
   unsigned long start_time = micros();
   unsigned long elapsed_time = 0;
@@ -529,9 +504,7 @@ void setup() {
   esp_sleep_enable_timer_wakeup(10 * 1000000);  // 10 seconds in microseconds
 }
 
-// ======================
-// MAIN LOOP (Unused)
-// ======================
+// Main loop is a fallback, mostly unused
 void loop() {
   unsigned long currentTime = millis();
 
@@ -542,7 +515,5 @@ void loop() {
     lastSleepTime = currentTime;  // Update the last sleep time
     esp_deep_sleep_start();       // Enter deep sleep
   }
-
-  // Perform other tasks here (e.g., sampling, MQTT communication)
   delay(1000);  // Add a delay to avoid busy looping
 }
