@@ -33,7 +33,6 @@ const float frequency2 = 12.0;     // Base frequency for DAC signal 2
 // const int amplitude2 = 6;         // Amplitude of sine wave 2
 // const float frequency2 = 15.0;     // Base frequency for DAC signal 2
 
-
 const int dacUpdateRate = 500;          // DAC update rate in Hz
 volatile float sampleFrequency = 1000.0;  // Initial maximun ADC sampling frequency
 
@@ -52,28 +51,18 @@ bool adaptiveDr = true;
 bool isTxConfirmed = true;
 uint8_t appPort = 2;
 
-/* --- LORAWAN LINKER FIXES --- */
-
 // The channels mask for your region (EU868 uses 0001)
 uint16_t userChannelsMask[6] = { 0x0001, 0x0000, 0x0000, 0x0000, 0x0000, 0x0000 };
-
 // Number of trials for a 'confirmed' message
 uint8_t confirmedNbTrials = 4;
-
 // ADR (Adaptive Data Rate) - set to true for battery efficiency
 bool loraWanAdr = true;
-
 // Duty cycle of the application (15 seconds)
 uint32_t appTxDutyCycle = 15000;
-
 // These are required by the linker even for OTAA mode
 uint32_t devAddr = (uint32_t)0;
 uint8_t nwkSKey[] = { 0 };
 uint8_t appSKey[] = { 0 };
-
-// // Prepare the payload
-// uint8_t appData[4]; // We will send the Dominant Frequency as a 4-byte float
-// uint8_t appDataSize = 4;
 
 // Global variables
 QueueHandle_t sampleQueue;               // Queue for FFT samples
@@ -491,9 +480,9 @@ void setup() {
 
   // Create tasks and assign them to specific cores
   xTaskCreatePinnedToCore(TaskDACWrite, "DAC_Gen", 4096, NULL, 1, NULL, 0);
-  xTaskCreatePinnedToCore(TaskADCRead, "ADC_Sample", 4096, NULL, 1, &ADC_TaskHandle, 1);
+  xTaskCreatePinnedToCore(TaskADCRead, "ADC_Sample", 4096, NULL, 2, &ADC_TaskHandle, 1);
   xTaskCreatePinnedToCore(TaskProcess, "Data_Process", 8192, NULL, 1, &Process_TaskHandle, 0);
-  xTaskCreatePinnedToCore(TaskAggregation, "RollingAverage", 4096, NULL, 2, NULL, 0);
+  xTaskCreatePinnedToCore(TaskAggregation, "RollingAverage", 4096, NULL, 2, NULL, 1);
 
   Serial.print("System Initialized: Tasks Running");
 

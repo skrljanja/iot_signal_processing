@@ -81,6 +81,11 @@ When the frequency of one of the waves is too high, the found max frequency actu
 input_signal(t) = 4*sin(2*pi*7*t)+11*sin(2*pi*100*t)
 ```
 
+## LLM Analysis 
+In contrast to my approach, the LLM only does it using 2 tasks. 
+Despite being given whole instructions, it does not produce code for connecting to WiFi and LoRa, but produces mostly correct code for the sampling, the FFT transform and the sampling noise filters. The communication could also be done if I employed further prompting. 
+However, for the FFT it only finds the peak frequency, not the maximum represented frequency, which is incorrect for adjusting sampling frequency. 
+
 ## Setup
 Clone this repository. I am running it in VSCode, using the platformIO and WOKWI plugins (Wokwi is only necessary in case that you want to run it on a simulated chip).
 The dependencies are listed in the .ini file and will resolve when building the project using platformIO.

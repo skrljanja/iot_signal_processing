@@ -4,7 +4,7 @@
 #include <PubSubClient.h>
 #include <lmic.h>
 #include <hal/hal.h>
-#include "filters.h"
+#include "filters-lmm.h"
 
 // Task Handles
 TaskHandle_t xSamplingTask;
