@@ -5,6 +5,14 @@ Internet of Things individual assignment
 
 The goal of the assignment is to create an IoT system that collects information from a sensor, analyses the data locally and communicates to a nearby server an aggregated value of the sensor readings. The IoT system adapts the sampling frequency in order to save energy and reduce communication overhead. The IoT device will be based on an ESP32 prototype board and the firmware will be developed using the FreeRTOS. You are free to use IoT-Lab or real devices.
 
+## Hardware 
+
+2x Heltec LoRa Wifi ESP32 V3
+1x INA 219
+
+For the sampling only 1 ESP32 is required (or a Wokwi simulation).
+For energy consumption measurements, all 3 are required. 
+
 ## Input signal 
 
 We are free to choose any signal of the form SUM(a_k*sin(f_k)). I have chosen: 
@@ -26,11 +34,11 @@ This is performed using the FFT.
 For robustness, I perform the FFT 6 times and take the average of the maximum frequencies found.
 
 ## Compute aggregate function over a window
-TaskAggregation calculates the average over a window 
+TaskAggregation calculates the average over a 5 second window of samples. 
 
 ## Communicating the aggregate value
 * Communication to the edge: Using MQTT over Wifi
-* Communication to the cloud: Using LoRaWAN+TTN - the connection is established only once we have already performed the FFT and adapted the sampling rate. 
+* Communication to the cloud: Using LoRaWAN+TTN - the connection is established only once we have already performed the FFT and adapted the sampling rate. Ohterwise, it seemed to affect the FFT, possibly due to overloading the chip.
 
 Note: when on Wokwi, use public broker for MQTT (uncomment and comment appropriate code in main-sampler.cpp) AND a virtual WiFI network called Wokwi-GUEST.
 
@@ -80,6 +88,8 @@ When the frequency of one of the waves is too high, the found max frequency actu
 ```
 input_signal(t) = 4*sin(2*pi*7*t)+11*sin(2*pi*100*t)
 ```
+
+It is constrained by FFT_SAMPLE_SIZE, which I have defined as 128 and the initial sampling frequency. My initial sampling frequency should be >200 to capture this signal correctly. 
 
 ## LLM Analysis 
 In contrast to my approach, the LLM only does it using 2 tasks. 
