@@ -1,5 +1,4 @@
-# iot_signal_processing
-Internet of Things individual assignment
+# Internet of Things: Individual Assignment
 
 ## Description
 
