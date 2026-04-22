@@ -36,7 +36,12 @@ Note: when on Wokwi, use public broker for MQTT (uncomment and comment appropria
 
 ## Measure the performance of the system
 ### Energy 
+Wiring 2 ESP32s + an INA 219 board, where 1 board is performing the sampling, communication and aggregation, and the other is reading the power and current readings given by the INA board. This is what the circuit looks like:
+
+![Circuit](img/circuit.jpeg)
+
 Since the sending is dependent on time, as opposed to number of samples, the result is actually really similar for both scenarios. 
+
 
 ![mA current using adaptive sampling](img/adaptive_sampling.png)
 
