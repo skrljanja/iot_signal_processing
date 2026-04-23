@@ -28,9 +28,9 @@ The goal of the assignment is to create an IoT system that collects information 
 
 ## Hardware 
 
-2x Heltec LoRa Wifi ESP32 V3
-1x INA 219
-1x USB-c cable
+* 2x Heltec LoRa Wifi ESP32 V3
+* 1x INA 219
+* 1x USB-c cable
 
 For the sampling only 1 ESP32 is required (or a Wokwi simulation).
 For energy consumption measurements, all 3 components are required.  
@@ -59,7 +59,9 @@ If we wanted to test the actual feasible maximum we can use yield() instead.  Th
 I perform the FFT 6 times and take the average of the maximum frequencies found. Additionally, instead of multiplying the found frequency by 2 (as per the Nyquist theorem), I multiply it by 2.2.
 
 For each bin, the threshold for the presence uses the Z-score:
-$$\text{Threshold} = \text{mean} + 2 \times \text{std\_dev}$$ 
+```
+float threshold = mean + 2 * stddev;
+```
 
 | | |
 |---|---|
@@ -136,7 +138,7 @@ I first put through a signal with a large amplitude difference:
 ```
 input_signal(t) = 128 + 1*sin(2*pi*23*t)+127*sin(2*pi*5*t)
 ```
-As shown in the !(Input)[#input] section, I am using a dynamic threshold. Despite the large amplitude difference this found the correct maximum frequency, because the 1 amplitude is still within the std range of the mean. 
+I am using a dynamic threshold. Despite the large amplitude difference this found the correct maximum frequency, because the 1 amplitude is still within the std range of the mean. 
 **Adapted to frequency:** 64.96 Hz
 
 Additionally, I input a signal with a very high frequency at one of the components: too high for my initial sampling rate (500Hz)

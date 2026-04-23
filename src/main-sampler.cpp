@@ -20,15 +20,15 @@ const int offset = 128;            // DC offset for sine wave
 // const int amplitude2 = 11;         // Amplitude of sine wave 2
 // const float frequency2 = 12.0;     // Base frequency for DAC signal 2
 // // BONUS SIGNAL 1
-const int amplitude = 1;           // Amplitude of sine wave 1
-const float frequency = 23.0;       // Base frequency for DAC signal  1
-const int amplitude2 = 127;         // Amplitude of sine wave 2
-const float frequency2 = 5.0;     // Base frequency for DAC signal 2
+// const int amplitude = 1;           // Amplitude of sine wave 1
+// const float frequency = 23.0;       // Base frequency for DAC signal  1
+// const int amplitude2 = 127;         // Amplitude of sine wave 2
+// const float frequency2 = 5.0;     // Base frequency for DAC signal 2
 // // // BONUS SIGNAL 2
-// const int amplitude = 9;           // Amplitude of sine wave 1
-// const float frequency = 43.0;       // Base frequency for DAC signal  1
-// const int amplitude2 = 6;         // Amplitude of sine wave 2
-// const float frequency2 = 700.0;     // Base frequency for DAC signal 2
+const int amplitude = 9;           // Amplitude of sine wave 1
+const float frequency = 10.0;       // Base frequency for DAC signal  1
+const int amplitude2 = 6;         // Amplitude of sine wave 2
+const float frequency2 = 700.0;     // Base frequency for DAC signal 2
 
 const int dacUpdateRate = 500;          // DAC update rate in Hz
 volatile float sampleFrequency = 1000.0;  // Initial maximun ADC sampling frequency
@@ -168,7 +168,7 @@ void connectToLoRaWAN() {
 }
 
 // Sine lookup table - this is faster then calling sin() in the DAC task. 
-#define TABLE_SIZE 512
+#define TABLE_SIZE 1024
 int sineTable1[TABLE_SIZE];
 int sineTable2[TABLE_SIZE];
 
@@ -178,8 +178,8 @@ void initSineTable() {
         // Pre-calculate: (amplitude * sin(angle) + offset)
         // Adjust values to fit 8-bit DAC (0-255)
         float angle = (2.0 * PI * i) / TABLE_SIZE;
-        sineTable1[i] = (int)(amplitude * sin(angle * frequency) + offset); // Combine two sine waves
-        sineTable2[i] = (int)(amplitude2 * sin(frequency2 * angle)); // Second sine wave
+        sineTable1[i] = (int)(amplitude * sin(angle)); // Combine two sine waves
+        sineTable2[i] = (int)(amplitude2 * sin(angle)); // Second sine wave
     }
 }
 
@@ -206,7 +206,7 @@ void TaskDACWrite(void* pvParameters) {
             int val1 = sineTable1[(int)index1 % TABLE_SIZE];
             int val2 = sineTable2[(int)index2 % TABLE_SIZE];
             
-            int sineSum = val1 + val2;
+            int sineSum = val1 + val2 + offset;
             
             // Constrain to 8-bit range to prevent wrapping/clipping
             if (sineSum > 255) sineSum = 255;
@@ -255,11 +255,11 @@ void TaskADCRead(void* parameter) {
       adc_data.delta_time = t_now - t_prev;
       t_prev = t_now;
 
-      int simulated_value2 = 128 + 1 * sin(2 * PI * 23 * (t_now / 1000000.0)) + 127 * sin(2 * PI * 5 * (t_now / 1000000.0));
-      int simulated_value3 = 128 + 9 * sin(2 * PI * 43 * (t_now / 1000000.0)) + 6 * sin(2 * PI * 700 * (t_now / 1000000.0));
+      // float s1 = offset + 1 * sin(2 * PI * 23 * (t_now / 1000000.0)) + 127 * sin(2 * PI * 5 * (t_now / 1000000.0));
+      // float s2 = offset + 9 * sin(2 * PI * 10 * (t_now / 1000000.0)) + 6 * sin(2 * PI * 700 * (t_now / 1000000.0));
 
       // to plot samples, print this
-      // Serial.println(String(adc_data.adc_value) + "\t" + String(simulated_value2) + "\t" + String(simulated_value3));
+      // Serial.println(String(adc_data.adc_value) + "\t" + String(s1) + "\t" + String(s2));  // For plotting raw ADC values
       xQueueSend(sampleQueue, &adc_data, 0);
       xQueueSend(aggQueue, &adc_data, 0);
     }
@@ -356,9 +356,9 @@ void TaskProcess(void* pvParameters) {
     count++;
 
     Serial.printf("[FFT] Max freq: %.2f Hz\n", maxFreq);
-    Serial.printf("[FFT] FINAL Sample freq: %.2f Hz\n", sampleFrequency);
-    Serial.printf("[FTT] Dominant Frequency is %.2f Hz \n", peakFrequency);
-    Serial.printf("{\"sample_freq\":%.2f}\n", savedSampleFrequency);  // Add sampling frequency output
+    // Serial.printf("[FFT] FINAL Sample freq: %.2f Hz\n", sampleFrequency);
+    // Serial.printf("[FTT] Dominant Frequency is %.2f Hz \n", peakFrequency);
+    // Serial.printf("{\"sample_freq\":%.2f}\n", savedSampleFrequency);  // Add sampling frequency output
 
     vTaskDelay(pdMS_TO_TICKS(1000));  // Delay for 1000 milliseconds
   }
@@ -471,7 +471,6 @@ void setup() {
   } else {
     Serial.println("{\"status\":\"Power-on or reset\"}");
     fftPerformed = false;  // Reset the flag on power-on
-    sampleFrequency = 50.0;  // Default sampling frequency
     savedSampleFrequency = sampleFrequency;  // Reset saved frequency
   }
 
