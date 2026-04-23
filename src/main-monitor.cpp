@@ -28,28 +28,8 @@ void setup(void)
 
 void loop(void)
 {
-  float shuntvoltage = 0;
-  float busvoltage = 0;
   float current_mA = 0;
-  float loadvoltage = 0;
-  float power_mW = 0;
-
-  shuntvoltage = ina219.getShuntVoltage_mV();
-  busvoltage = ina219.getBusVoltage_V();
   current_mA = ina219.getCurrent_mA();
-  power_mW = ina219.getPower_mW();
-  loadvoltage = busvoltage + (shuntvoltage / 1000);
-
-  // print tab seperated value for serial monitor graphing
-  Serial.print(busvoltage);
-  Serial.print("\t");
-  Serial.print(shuntvoltage);
-  Serial.print("\t");
-  Serial.print(loadvoltage);
-  Serial.print("\t");
-  Serial.print(current_mA);
-  Serial.print("\t");
-  Serial.println(power_mW);
-
+  Serial.println(current_mA);
   delay(50);
 }

@@ -8,33 +8,31 @@
 #include <arduinoFFT.h>    // FFT processing library
 #include "LoRaWan_APP.h"  // LoRaWAN library
 
-// ======================
-// CONFIGURATION CONSTANTS
-// ======================
+
 #define FFT_SAMPLE_SIZE 128                 // FFT window size
 #define QUEUE_LENGTH (FFT_SAMPLE_SIZE * 4)  // Size of FreeRTOS queues
-#define ADC_PIN 1                          // GPIO34 used for ADC input
 #define DAC_PIN 25                          // GPIO25 used for DAC output
 #define SINE_DEBUG false
 
 const int offset = 128;            // DC offset for sine wave
-const int amplitude = 5;           // Amplitude of sine wave 1
-const float frequency = 2.0;       // Base frequency for DAC signal  1
-const int amplitude2 = 11;         // Amplitude of sine wave 2
-const float frequency2 = 12.0;     // Base frequency for DAC signal 2
+// const int amplitude = 5;           // Amplitude of sine wave 1
+// const float frequency = 2.0;       // Base frequency for DAC signal  1
+// const int amplitude2 = 11;         // Amplitude of sine wave 2
+// const float frequency2 = 12.0;     // Base frequency for DAC signal 2
 // // BONUS SIGNAL 1
-// const int amplitude = 7;           // Amplitude of sine wave 1
-// const float frequency = 23.0;       // Base frequency for DAC signal  1
-// const int amplitude2 = 8;         // Amplitude of sine wave 2
-// const float frequency2 = 100.0;     // Base frequency for DAC signal 2
-// // BONUS SIGNAL 2
+const int amplitude = 1;           // Amplitude of sine wave 1
+const float frequency = 23.0;       // Base frequency for DAC signal  1
+const int amplitude2 = 127;         // Amplitude of sine wave 2
+const float frequency2 = 5.0;     // Base frequency for DAC signal 2
+// // // BONUS SIGNAL 2
 // const int amplitude = 9;           // Amplitude of sine wave 1
 // const float frequency = 43.0;       // Base frequency for DAC signal  1
 // const int amplitude2 = 6;         // Amplitude of sine wave 2
-// const float frequency2 = 15.0;     // Base frequency for DAC signal 2
+// const float frequency2 = 700.0;     // Base frequency for DAC signal 2
 
 const int dacUpdateRate = 500;          // DAC update rate in Hz
 volatile float sampleFrequency = 1000.0;  // Initial maximun ADC sampling frequency
+volatile float currentAvg = 0.0;          // Current rolling average
 
 
 /* TTN KEYS (LSB for EUIs, MSB for AppKey) */
@@ -81,8 +79,10 @@ typedef struct {
 // MQTT CONFIGURATION
 
 volatile bool mqtt_connected = false;  // MQTT connection status flag
-const char* ssid = "Anja's Galaxy A32 5G";
-const char* password = "marina123";
+// const char* ssid = "Anja's Galaxy A32 5G";
+// const char* password = "marina123";
+const char* ssid = "H6745-94508588";
+const char* password = "XK3eHhyFzC";
 // For PHYSICAL BOARD uncomment this and use local broker
 //const char* mqtt_server = "10.154.173.32"; // local IP address
 // for WOKWI SIMULATION use the public broker
@@ -144,6 +144,9 @@ void connectToMQTT() {
   }
 
   if (!client.connected()) {
+    if (client.subscribe(mqtt_topic)) {
+      Serial.println("{\"mqtt_status\":\"Subscribed to topic!\"}");
+    }
     Serial.println("{\"mqtt_status\":\"Failed to connect to MQTT broker after multiple attempts. Restarting...\"}");
     // ESP.restart();  // Uncomment if you want to restart the ESP32 on failure
   }
@@ -166,7 +169,8 @@ void connectToLoRaWAN() {
 
 // Sine lookup table - this is faster then calling sin() in the DAC task. 
 #define TABLE_SIZE 512
-int sineTable[TABLE_SIZE];
+int sineTable1[TABLE_SIZE];
+int sineTable2[TABLE_SIZE];
 
 // Call this once in void setup(). This makes the sampling faster then calling sin() everytime.
 void initSineTable() {
@@ -174,7 +178,8 @@ void initSineTable() {
         // Pre-calculate: (amplitude * sin(angle) + offset)
         // Adjust values to fit 8-bit DAC (0-255)
         float angle = (2.0 * PI * i) / TABLE_SIZE;
-        sineTable[i] = (int)(amplitude * sin(angle) + offset);
+        sineTable1[i] = (int)(amplitude * sin(angle * frequency) + offset); // Combine two sine waves
+        sineTable2[i] = (int)(amplitude2 * sin(frequency2 * angle)); // Second sine wave
     }
 }
 
@@ -198,8 +203,8 @@ void TaskDACWrite(void* pvParameters) {
         
         if (now - lastUpdate >= interval) {
             // Fast lookup instead of sin()
-            int val1 = sineTable[(int)index1 % TABLE_SIZE];
-            int val2 = sineTable[(int)index2 % TABLE_SIZE];
+            int val1 = sineTable1[(int)index1 % TABLE_SIZE];
+            int val2 = sineTable2[(int)index2 % TABLE_SIZE];
             
             int sineSum = val1 + val2;
             
@@ -233,29 +238,30 @@ void TaskDACWrite(void* pvParameters) {
     }
 }
 
-// ------------------------------------------------------------------------------------------------------------------------------------------------------------------
-
-// ADC Sampling task - core 2
+// NOTE: No ADC, this is simulated!
 void TaskADCRead(void* parameter) {
   ADCData_t adc_data;
-  unsigned long t_prev = micros();  // Initial timestamp
-  portENTER_CRITICAL(&samplingMux);
-  unsigned long samplePeriod;
-  portEXIT_CRITICAL(&samplingMux);
+  uint8_t table_index = 0; // Wraps around automatically at 256 if uint8_t
   unsigned long lastSampleTime = micros();
-  while (1) {
-    samplePeriod = 1000000UL / savedSampleFrequency;
-    if ((micros() - lastSampleTime) >= samplePeriod) {
-      lastSampleTime += samplePeriod;
-      unsigned long t_now = micros();            // Capture time
-      adc_data.adc_value = analogRead(ADC_PIN);  // Read ADC value
-      adc_data.delta_time = t_now - t_prev;      // Time since last sample
+  unsigned long t_prev = micros();
 
-      // Send sample to both queues (non-blocking)
+  while (1) {
+    unsigned long samplePeriod = 1000000UL / savedSampleFrequency;
+    unsigned long t_now = micros();
+
+    if ((t_now - lastSampleTime) >= samplePeriod) {
+      lastSampleTime += samplePeriod;
+      adc_data.adc_value = ledcRead(0);
+      adc_data.delta_time = t_now - t_prev;
+      t_prev = t_now;
+
+      int simulated_value2 = 128 + 1 * sin(2 * PI * 23 * (t_now / 1000000.0)) + 127 * sin(2 * PI * 5 * (t_now / 1000000.0));
+      int simulated_value3 = 128 + 9 * sin(2 * PI * 43 * (t_now / 1000000.0)) + 6 * sin(2 * PI * 700 * (t_now / 1000000.0));
+
+      // to plot samples, print this
+      // Serial.println(String(adc_data.adc_value) + "\t" + String(simulated_value2) + "\t" + String(simulated_value3));
       xQueueSend(sampleQueue, &adc_data, 0);
       xQueueSend(aggQueue, &adc_data, 0);
-
-      t_prev = t_now;  // Update timestamp
     }
     vTaskDelay(1);
   }
@@ -266,6 +272,7 @@ void TaskProcess(void* pvParameters) {
   if (fftPerformed) {
     Serial.println("[FFT] Skipping FFT computation (already performed).");
     vTaskDelete(NULL);  // Terminate the task
+    connectToLoRaWAN();  // Connect to LoRaWAN network even if FFT is skipped
     return;
   }
 
@@ -289,6 +296,8 @@ void TaskProcess(void* pvParameters) {
         vReal[i] = data.adc_value;         // Real part of FFT input
         vImag[i] = 0.0;                    // Imaginary part initialized to 0
         sum += freqs[i];                   // Accumulate sampling frequencies
+        //Serial.println("{\"adc_value\":" + String(data.adc_value) + ",\"delta_time\":" + String(data.delta_time) + ",\"calculated_freq\":" + String(freqs[i]) + "}");
+        // Serial.println(String(data.adc_value));  // For plotting raw ADC values
       } else {
         Serial.print("Process Error: Queue broken!");
         break;
@@ -336,26 +345,20 @@ void TaskProcess(void* pvParameters) {
         maxFreq = i * binWidth;
       }
     }
+    //Serial.println(String(data.adc_value) + "\t" + String(maxFreq));
 
     if (maxFreq > 1.0 && maxFreq <= 10000.0) {
       portENTER_CRITICAL(&samplingMux);
-      totalSampleFrequency += 2.0 * maxFreq;  // Adapt sampling frequency
+      totalSampleFrequency += 2.2 * maxFreq;  // Adapt sampling frequency
       portEXIT_CRITICAL(&samplingMux);
     }
 
-    // if (toPlot_fft) {
-    //   for (int i = 1; i < N; i++) {
-    //     float freq = i * binWidth;
-    //     Serial.printf("FFT:%.2f:%.2f\n", freq, vReal[i]);  // FFT:<frequency_in_Hz>:<magnitude>
-    //   }
-    // }
     count++;
 
     Serial.printf("[FFT] Max freq: %.2f Hz\n", maxFreq);
     Serial.printf("[FFT] FINAL Sample freq: %.2f Hz\n", sampleFrequency);
     Serial.printf("[FTT] Dominant Frequency is %.2f Hz \n", peakFrequency);
     Serial.printf("{\"sample_freq\":%.2f}\n", savedSampleFrequency);  // Add sampling frequency output
-
 
     vTaskDelay(pdMS_TO_TICKS(1000));  // Delay for 1000 milliseconds
   }
@@ -369,8 +372,8 @@ void TaskProcess(void* pvParameters) {
 }
 
   // uncomment to oversample at maximum frequency
-  // sampleFrequency = 1000;
-  // savedSampleFrequency = 1000;
+  //sampleFrequency = 1000;
+  //savedSampleFrequency = 1000;
   fftPerformed = true;  // Set the flag to indicate FFT has been performed
   Serial.println("[FFT] FFT computation completed. Flag set. The sampling frequency is adapted to ");
   Serial.printf("%.2f Hz\n", sampleFrequency);
@@ -395,29 +398,17 @@ void TaskAggregation(void* param) {
         unsigned long aggregation_start = micros();  // Every 5 seconds
         float average = (count > 0) ? (float)sum / count : 0.0;
         unsigned long timestamp = micros();  // Capture the timestamp when data is sent
-
-        // Send data with timestamp
-        Serial.printf("{\"average\":%.2f,\"samples\":%d,\"timestamp\":%lu}\n", average, count, timestamp);
-
-        Serial.printf("{\"average\":%.2f,\"samples\":%d}\n", average, count);
-        Serial.printf("{\"sample_freq\":%.2f}\n", savedSampleFrequency);  // Add sampling frequency output
-
+        currentAvg = average;  // Update the current average
         if (mqtt_connected) {
           char payload[64];
           snprintf(payload, sizeof(payload), "{\"average\":%.2f,\"timestamp\":%lu}", average, timestamp);
           if (client.publish(mqtt_topic, payload)) {
             Serial.printf("{\"mqtt_status\":\"Sent average: %.2f\"}\n", average);
           } else {
-            Serial.println("{\"mqtt_status\":\"Failed to send data!\"}");
+            // Serial.println("{\"mqtt_status\":\"Failed to send data!\"}");
           }
         }
-        if (loraConnected) {
-          // Convert float average to byte array
-          memcpy(appData, &average, 4);
-      
-          LoRaWAN.send();
-          Serial.println("[LoRa] Packet sent to TTN");
-      }
+
         // Reset counters
         start_time = micros();
         sum = 0;
@@ -429,13 +420,50 @@ void TaskAggregation(void* param) {
   }
 }
 
+void TaskLoRaSend(void* param) {
+  while (1) {
+    if (loraConnected) {
+      if (fftPerformed) {
+      float averageToSend = currentAvg;  // Capture the current average for sending
+      memcpy(appData, &averageToSend, 4);
+      appDataSize = 4; 
+      // Check if the radio is busy before sending
+      LoRaWAN.send();
+      Serial.println("[LoRa] Packet queued for transmission");
+    }
+    vTaskDelay(5000);  // Check every 5500 ms
+  } // Handle LoRaWAN events
+    }
+  
+}
+
+
 unsigned long lastSleepTime = 0;  // Tracks the last time deep sleep was triggered
+void printIntArray(int arr[], int size) {
+  Serial.println("--- Array Contents ---");
+  for (int i = 0; i < size; i++) {
+    Serial.print(arr[i]);
+    
+    // Add a comma and space between numbers
+    if (i < size - 1) {
+      Serial.print(", ");
+    }
+
+    // Every 16 elements, start a new line for readability
+    if ((i + 1) % 16 == 0) {
+      Serial.println();
+    }
+  }
+  Serial.println("\n--- End of Array ---");
+}
+
 
 void setup() {
   Serial.begin(115200);
   delay(1000);
   ledcSetup(0, 5000, 8);
   ledcAttachPin(DAC_PIN, 0);
+  initSineTable();
 
   // Check if the ESP32 woke up from deep sleep
   if (esp_sleep_get_wakeup_cause() == ESP_SLEEP_WAKEUP_TIMER) {
@@ -483,7 +511,6 @@ void setup() {
   xTaskCreatePinnedToCore(TaskADCRead, "ADC_Sample", 4096, NULL, 2, &ADC_TaskHandle, 1);
   xTaskCreatePinnedToCore(TaskProcess, "Data_Process", 8192, NULL, 1, &Process_TaskHandle, 0);
   xTaskCreatePinnedToCore(TaskAggregation, "RollingAverage", 4096, NULL, 2, NULL, 1);
-
   Serial.print("System Initialized: Tasks Running");
 
   // Set up deep sleep for 10 seconds
