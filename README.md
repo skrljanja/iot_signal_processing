@@ -1,3 +1,5 @@
+# Internet of Things: Individual Assignment
+
 <!-- Badges: optional, you can remove or swap these. -->
 <p align="center">
   <img src="https://img.shields.io/badge/platform-ESP32--S3-blue" alt="Platform">
@@ -20,9 +22,6 @@
 | **Student** | Anja Škrlj |
 
 
-## Table of Contents
-
-
 ## Overview
 
 The goal of the assignment is to create an IoT system that collects information from a sensor, analyses the data locally and communicates to a nearby server an aggregated value of the sensor readings. The IoT system adapts the sampling frequency in order to save energy and reduce communication overhead. The IoT device will be based on an ESP32 prototype board and the firmware will be developed using the FreeRTOS. You are free to use IoT-Lab or real devices.
@@ -31,9 +30,10 @@ The goal of the assignment is to create an IoT system that collects information 
 
 2x Heltec LoRa Wifi ESP32 V3
 1x INA 219
+1x USB-c cable
 
 For the sampling only 1 ESP32 is required (or a Wokwi simulation).
-For energy consumption measurements, all 3 are required. 
+For energy consumption measurements, all 3 components are required.  
 
 ## Input signal 
 
@@ -61,9 +61,16 @@ I perform the FFT 6 times and take the average of the maximum frequencies found.
 For each bin, the threshold for the presence uses the Z-score:
 $$\text{Threshold} = \text{mean} + 2 \times \text{std\_dev}$$ 
 
-The FFTs for the signal above (with actual max frequency of 12Hz) returned: 8.59 Hz, 15.23 Hz, 8.59 Hz, 11.33 Hz, 8.98 Hz, 10.94 Hz
+|Pass|Detected Max Frequency (Hz)|
+|1|8.59 Hz|
+|2|15.23 Hz|
+|3|9.59 Hz|
+|4|11.33 Hz|
+|5|10.98 Hz|
+|6|10.94 Hz|
+|Average|11.11 Hz|
 
-The sampler adapted to a sampling rate of 28.01Hz, which is in line with the theoretical ideal of 24Hz. 
+The sampler adapted to a sampling rate of 24.44Hz, which is in line with the theoretical ideal of 24Hz. 
 
 ## Compute aggregate function over a window
 
