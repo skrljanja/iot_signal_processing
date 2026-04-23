@@ -22,22 +22,6 @@
 
 ## Table of Contents
 
-- [Overview](#overview)
-- [Hardware](#hardware)
-- [Getting started](#getting-started)
-  - [Prerequisites](#prerequisites)
-  - [Repository layout](#repository-layout)
-  - [Configuration](#configuration)
-  - [Build and flash](#build-and-flash)
-  - [Running in MQTT mode](#running-in-mqtt-mode)
-  - [Running in LoRaWAN mode](#running-in-lorawan-mode)
-  - [Reproducing the energy measurements](#reproducing-the-energy-measurements)
-  - [Reproducing the bonus experiments](#reproducing-the-bonus-experiments)
-- [Software architecture](#software-architecture)
-- [Signal processing](#signal-processing)
-- [Communication](#communication)
-- [Performance evaluation](#performance-evaluation)
-- [Bonus](#bonus)
 
 ## Overview
 
