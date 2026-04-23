@@ -61,6 +61,8 @@ I perform the FFT 6 times and take the average of the maximum frequencies found.
 For each bin, the threshold for the presence uses the Z-score:
 $$\text{Threshold} = \text{mean} + 2 \times \text{std\_dev}$$ 
 
+| | |
+|---|---|
 |Pass|Detected Max Frequency (Hz)|
 |1|8.59 Hz|
 |2|15.23 Hz|
@@ -68,7 +70,7 @@ $$\text{Threshold} = \text{mean} + 2 \times \text{std\_dev}$$
 |4|11.33 Hz|
 |5|10.98 Hz|
 |6|10.94 Hz|
-|Average|11.11 Hz|
+|**Average**|11.11 Hz|
 
 The sampler adapted to a sampling rate of 24.44Hz, which is in line with the theoretical ideal of 24Hz. 
 
@@ -128,17 +130,30 @@ After each uplink, the device opens two receive windows: 5s after sending and 6s
 ## Bonus: Other signals
 To try other signals, uncomment the different amplitude/frequency variables in main-sampler.cpp (20-35).
 
+![sine signals](signals.png)
+
 I first put through a signal with a large amplitude difference:
 ```
 input_signal(t) = 128 + 1*sin(2*pi*23*t)+127*sin(2*pi*5*t)
 ```
 As shown in the !(Input)[#input] section, I am using a dynamic threshold. Despite the large amplitude difference this found the correct maximum frequency, because the 1 amplitude is still within the std range of the mean. 
-*Adapted to frequency:* 64.96 Hz
+**Adapted to frequency:** 64.96 Hz
 
+Additionally, I input a signal with a very high frequency at one of the components: too high for my initial sampling rate (500Hz)
 ```
 input_signal(t) = 128 + 9*sin(2*pi*43*t)+6*sin(2*pi*700*t)
 ```
 
+| | |
+|---|---|
+|Pass|Detected Max Frequency (Hz)|
+|1|296.40 Hz|
+|2|289.06 Hz|
+|3| 304.69 Hz|
+|4|296.88 Hz|
+|5|304.69 Hz|
+
+**Adapted to frequency:** 786.98 Hz
 
 
 It is constrained by FFT_SAMPLE_SIZE, which I have defined as 128 and the initial sampling frequency. My initial sampling frequency should be >200 to capture this signal correctly. 
