@@ -40,7 +40,7 @@ For energy consumption measurements, all 3 components are required.
 * WRITE: using a sine lookup table, generates an artificial signal.
 * READ: reads the signal, and pushes it to 2 queues - one for the PROCESS task, and another for AGGREGATE
 * AGGREGATE: use AGGREGATE queue and compute average over a 5 second window of samples, then sends the computed average
-* PROCESS: ise SAMPLE queue and perform the FFT, once adapted this task becomes idle
+* PROCESS: use SAMPLE queue and perform the FFT, once adapted this task becomes idle
 
 ## Input signal 
 
