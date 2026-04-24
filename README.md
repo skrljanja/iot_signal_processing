@@ -35,6 +35,13 @@ The goal of the assignment is to create an IoT system that collects information 
 For the sampling only 1 ESP32 is required (or a Wokwi simulation).
 For energy consumption measurements, all 3 components are required.  
 
+## Four Task organisation 
+
+* WRITE: using a sine lookup table, generates an artificial signal.
+* READ: reads the signal, and pushes it to 2 queues - one for the PROCESS task, and another for AGGREGATE
+* AGGREGATE: use AGGREGATE queue and compute average over a 5 second window of samples, then sends the computed average
+* PROCESS: ise SAMPLE queue and perform the FFT, once adapted this task becomes idle
+
 ## Input signal 
 
 The board I am using does not have a DAC. I am simulating this by a sine lookup table, writing the results at each point to a led pin (resolution 20 bits). 
@@ -45,6 +52,7 @@ input_signal(t) = 128 + 5*sin(2*pi*2*t)+11*sin(2*pi*12*t)
 ```
 
 There are two more signals, elaborated on in the Bonus section.
+Note, that both the writing and reading is done on the same board. 
 
 
 ## Maximum Sampling Frequency
@@ -52,15 +60,15 @@ Note, that we are not using a real sensor, so really the maximum frequency depen
 
 I also look at the actual sampling rate experimentally, by counting samples in the loop.
 
-If we wanted to test the actual feasible maximum we can use yield() instead.  This way, the actual sampling frequency goes up to rouhgly 42kHz. However, this might stop other tasks so it is an unsafe way of sampling, if we want the same board to also do other things. 
+If we wanted to test the actual feasible maximum we can use yield() instead.  This way, the actual sampling frequency goes up to rouhgly 20kHz. However, this might stop other tasks so it is an unsafe way of sampling, if we want the same board to also do other things. 
 
 ## Identify optimal sampling frequency
 
 I perform the FFT 6 times and take the average of the maximum frequencies found. Additionally, instead of multiplying the found frequency by 2 (as per the Nyquist theorem), I multiply it by 2.2.
 
-For each bin, the threshold for the presence uses the Z-score:
+For each bin, the threshold for the presence is dynamic, based on the mean and standard deviation:
 ```
-float threshold = mean + 2 * stddev;
+float threshold = mean - 2 * stddev;
 ```
 
 | | |
@@ -108,6 +116,14 @@ The possible reasons for the lack of difference are:
 * The power supply is an USB connection to my laptop: the USB-to-UART bridge chip comsumes power and adds noise to the base current, masking small differences caused by frequency
 * The communication is the power bottleneck, also masking the small difference caused by sampling 
 
+In order to investigate this, I also performed the energy measuring while not running mqtt and lora communications. Again, the difference was not to be seen: 
+
+![mA current using adaptive sampling](img/adaptive2.png)
+
+![mA current using oversampling](img/oversampled2.png)
+
+Still, the difference was pretty small: the fact that the same device is both reading and writing is likely the reason. Note, that the writing is always done at the same frequency. 
+
 ### Per window execution 
 This was measured by noting the time at the start of the aggregation, and printing the time elapsed once we have sent the aggregated data via WiFi. 
 
@@ -130,6 +146,7 @@ After each uplink, the device opens two receive windows: 5s after sending and 6s
 
 
 ## Bonus: Other signals
+
 To try other signals, uncomment the different amplitude/frequency variables in main-sampler.cpp (20-35).
 
 ![sine signals](signals.png)
@@ -157,8 +174,7 @@ input_signal(t) = 128 + 9*sin(2*pi*43*t)+6*sin(2*pi*700*t)
 
 **Adapted to frequency:** 786.98 Hz
 
-
-It is constrained by FFT_SAMPLE_SIZE, which I have defined as 128 and the initial sampling frequency. My initial sampling frequency should be >200 to capture this signal correctly. 
+It is constrained bythe initial sampling frequency. My initial sampling frequency should be >1400 to capture this signal correctly. 
 
 ## LLM Analysis 
 In contrast to my approach, the LLM only does it using 2 tasks. 
