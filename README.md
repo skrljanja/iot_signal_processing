@@ -102,8 +102,9 @@ Wiring 2 ESP32s + an INA 219 board, where 1 board is performing the sampling, co
 
 ![Circuit](img/circuit.jpeg)
 
-Since the sending is dependent on time, as opposed to number of samples, the result is actually really similar for both scenarios. 
-
+Note 2 limitations of this setup:
+* The same board is writing and reading the sampler, which means the board will not sleep between reading samples 
+* There is no external battery source and connecting the board by USB, means an UART bridge stays open, affecting the power consumption
 
 ![mA current using adaptive sampling](img/adaptive_sampling.png)
 
@@ -112,24 +113,24 @@ Since the sending is dependent on time, as opposed to number of samples, the res
 Here, I get an unexpected result: the power consumption is actually really similar. 
 In order to try and see a difference I calibrated the INA resolution, but it did not change the results. 
 
-The possible reasons for the lack of difference are:
-* The power supply is an USB connection to my laptop: the USB-to-UART bridge chip comsumes power and adds noise to the base current, masking small differences caused by frequency
-* The communication is the power bottleneck, also masking the small difference caused by sampling 
+Furthermore, I hypothesised that the communication is a power bottleneck, potentially further masking the small difference caused by sampling 
 
-In order to investigate this, I also performed the energy measuring while not running mqtt and lora communications. Again, the difference was not to be seen: 
+In order to investigate this, I also performed the energy measuring while not running mqtt and lora communications. Again, the difference was not noticable: 
 
 ![mA current using adaptive sampling](img/adaptive2.png)
 
 ![mA current using oversampling](img/oversampled2.png)
 
-Still, the difference was pretty small: the fact that the same device is both reading and writing is likely the reason. Note, that the writing is always done at the same frequency. 
+Still, the difference was pretty small: the fact that the same device is both reading and writing is likely the reason. 
 
-### Per window execution 
+### Per window execution
+
 This was measured by noting the time at the start of the aggregation, and printing the time elapsed once we have sent the aggregated data via WiFi. 
 
 Both take around 2ms (including MQTT sending), with oversampling taking order of magnitude 0.1ms more on average. The aggregation is likely a much smaller part of the execution time compared to the MQTT communication. 
 
 ### Volume of Data
+
 The data is transmitted per aggregated window - since the aggregation is done on a fixed window of time, the sampling rate has no effect on the volume of communicated data. 
 
 By design, the 2 radios carry different payloads
@@ -138,8 +139,18 @@ By design, the 2 radios carry different payloads
 
 ## Latency
 
-I measued MQTT latencies by subscribing to my own topic and observing the timestamp differences. The latencies I saw were: 35 ms, 32 ms, 85 ms, 140 ms, 30 ms
-Potentially more jitter, possibly because I used a public broker. 
+I measued MQTT latencies by subscribing to my own topic and observing the timestamp differences. The latencies I saw were:
+
+| | |
+|---|---|
+|Pass|Latency|
+|1|35ms|
+|2|32ms|
+|3|85ms|
+|4|140ms|
+|5|30ms|
+
+Potentially more jitter then other students have observed, possibly because I used a public broker. 
 
 With LoRa we expect bigger latencies, because of the class and frequency we are using (Class A, EU868)
 After each uplink, the device opens two receive windows: 5s after sending and 6s after sending. 
