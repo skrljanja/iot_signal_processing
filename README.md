@@ -185,9 +185,10 @@ input_signal(t) = 128 + 9*sin(2*pi*43*t)+6*sin(2*pi*700*t)
 
 **Adapted to frequency:** 786.98 Hz
 
-It is constrained bythe initial sampling frequency. My initial sampling frequency should be >1400 to capture this signal correctly. 
+It is constrained by the initial sampling frequency (500Hz). My initial sampling frequency should be >1400 to capture this signal correctly. 
 
 ## LLM Analysis 
+
 In contrast to my approach, the LLM only does it using 2 tasks. 
 Despite being given whole instructions, it does not produce code for connecting to WiFi and LoRa, but produces mostly correct code for the sampling, the FFT transform and the sampling noise filters. The communication could also be done if I employed further prompting. 
 However, for the FFT it only finds the peak frequency, not the maximum represented frequency, which is incorrect for adjusting sampling frequency - could lead for undersampling. 
@@ -196,9 +197,10 @@ Other observations
 * It uses mutexes, which are potentially overkill for this project, but are good practice 
 
 ## Setup
+
 Clone this repository. I am running it in VSCode, using the platformIO and WOKWI plugins (Wokwi is only necessary in case that you want to run it on a simulated chip).
 The dependencies are listed in the .ini file and will resolve when building the project using platformIO.
 
-Monitoring the power consumption is not possible in the simulation - 2 ESP32 chips are required, one for running the code, the other for monitoring power consumption. 
+Monitoring the power consumption is not possible in the simulation - 2 ESP32 chips are required, one for running the code, the other for monitoring power consumption. The wiring is explained ![here](https://andreavitaletti.github.io/IoT_short_course/energy/)
 
 To connect to WiFi, edit the WiFi configuration variables in main-sampler.cpp (96-100)
