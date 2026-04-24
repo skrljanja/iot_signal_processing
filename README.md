@@ -66,10 +66,7 @@ If we wanted to test the actual feasible maximum we can use yield() instead.  Th
 
 I perform the FFT 6 times and take the average of the maximum frequencies found. Additionally, instead of multiplying the found frequency by 2 (as per the Nyquist theorem), I multiply it by 2.2.
 
-For each bin, the threshold for the presence is dynamic, based on the mean and standard deviation:
-```
-float threshold = mean - 2 * stddev;
-```
+For each bin, the threshold for the presence is dynamic, based on the mean and standard deviation.
 
 | | |
 |---|---|
